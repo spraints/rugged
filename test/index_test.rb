@@ -233,4 +233,58 @@ class IndexRepositoryTest < Rugged::TestCase
     tree = index.write_tree(@repo)
     assert_equal '(todo)', tree
   end
+
+  def test_build_tree_from_index_with_one_of_the_bad_trees_files
+    failed = []
+
+    fixture = File.expand_path('fixtures/unwritable-tree.tar', File.dirname(__FILE__))
+    require 'rubygems/package'
+    File.open(fixture) do |f|
+      Gem::Package::TarReader.new(f) do |tar|
+        tar.each do |entry|
+          index_entry = {}
+          begin
+            index = Rugged::Index.new
+            if entry.file?
+              index_entry[:oid] = @repo.write(entry.read, :blob)
+              index_entry[:path] = entry.full_name.sub(/^\.\//, '') # remove the leading './'
+              index_entry[:mode] = 0100644
+              index << index_entry
+            end
+            tree = index.write_tree(@repo)
+          rescue Rugged::TreeError
+            failed << index_entry[:path]
+          end
+        end
+      end
+    end
+
+    assert_equal [], failed
+  end
+
+  def test_build_tree_from_index_of_failing_tree_excluding_dotgit
+    index = Rugged::Index.new
+
+    fixture = File.expand_path('fixtures/unwritable-tree.tar', File.dirname(__FILE__))
+    require 'rubygems/package'
+    File.open(fixture) do |f|
+      Gem::Package::TarReader.new(f) do |tar|
+        tar.each do |entry|
+          if entry.file?
+            parts = entry.full_name.split(/\//)
+            unless parts.include?('.git')
+              index_entry = {}
+              index_entry[:oid] = @repo.write(entry.read, :blob)
+              index_entry[:path] = entry.full_name.sub(/^\.\//, '') # remove the leading './'
+              index_entry[:mode] = 0100644
+              index << index_entry
+            end
+          end
+        end
+      end
+    end
+
+    tree = index.write_tree(@repo)
+    assert_equal "4bb34a01cf33899619fa964c7aa8e5e93c9fdeb8", tree
+  end
 end
