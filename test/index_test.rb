@@ -210,4 +210,27 @@ class IndexRepositoryTest < Rugged::TestCase
     assert head_sha != new_tree_sha
     assert_nil @repo.lookup(new_tree_sha)['second.txt']
   end
+
+  def test_build_tree_from_index_but_it_fails
+    index = Rugged::Index.new
+
+    fixture = File.expand_path('fixtures/unwritable-tree.tar', File.dirname(__FILE__))
+    require 'rubygems/package'
+    File.open(fixture) do |f|
+      Gem::Package::TarReader.new(f) do |tar|
+        tar.each do |entry|
+          if entry.file?
+            index_entry = {}
+            index_entry[:oid] = @repo.write(entry.read, :blob)
+            index_entry[:path] = entry.full_name.sub(/^\.\//, '') # remove the leading './'
+            index_entry[:mode] = 0100644
+            index << index_entry
+          end
+        end
+      end
+    end
+
+    tree = index.write_tree(@repo)
+    assert_equal '(todo)', tree
+  end
 end
