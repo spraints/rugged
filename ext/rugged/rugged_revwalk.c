@@ -31,10 +31,16 @@ struct __rugged_revwalk {
   git_revwalk *walk;
 };
 
-static void rb_git_walk__free(struct __rugged_revwalk *_walk)
+static void __rugged_revwalk_free(struct __rugged_revwalk *_walk)
 {
         if (_walk->walk)
           git_revwalk_free(_walk->walk);
+        _walk->walk = NULL;
+}
+
+static void rb_git_walk__free(struct __rugged_revwalk *_walk)
+{
+        __rugged_revwalk_free(_walk);
         xfree(_walk);
 }
 
@@ -324,10 +330,27 @@ static VALUE rb_git_walker_reset(VALUE self)
 	return Qnil;
 }
 
+/*
+ *  call-seq:
+ *    walker.close -> nil
+ *
+ *  Remove all pushed and hidden commits and reset the +walker+
+ *  back into a blank state.
+ */
+static VALUE rb_git_walker_close(VALUE self)
+{
+        struct __rugged_revwalk *_walk;
+	Data_Get_Struct(self, struct __rugged_revwalk, _walk);
+        __rugged_revwalk_free(_walk);
+	return Qnil;
+}
+
 void Init_rugged_revwalk(void)
 {
 	rb_cRuggedWalker = rb_define_class_under(rb_mRugged, "Walker", rb_cObject);
 	rb_define_singleton_method(rb_cRuggedWalker, "new", rb_git_walker_new, 1);
+
+	rb_define_method(rb_cRuggedWalker, "close", rb_git_walker_close, 0);
 
 	rb_define_method(rb_cRuggedWalker, "push", rb_git_walker_push, 1);
 	rb_define_method(rb_cRuggedWalker, "push_range", rb_git_walker_push_range, 1);
