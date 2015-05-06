@@ -27,14 +27,20 @@
 extern VALUE rb_mRugged;
 VALUE rb_cRuggedWalker;
 
-static void rb_git_walk__free(git_revwalk *walk)
+struct __rugged_revwalk {
+  git_revwalk *walk;
+};
+
+static void rb_git_walk__free(struct __rugged_revwalk *_walk)
 {
-	git_revwalk_free(walk);
+	git_revwalk_free(_walk->walk);
+        xfree(_walk);
 }
 
 VALUE rugged_walker_new(VALUE klass, VALUE owner, git_revwalk *walk)
 {
-	VALUE rb_walk = Data_Wrap_Struct(klass, NULL, &rb_git_walk__free, walk);
+        struct __rugged_revwalk *_walk = xmalloc(sizeof(struct __rugged_revwalk));
+	VALUE rb_walk = Data_Wrap_Struct(klass, NULL, &rb_git_walk__free, _walk);
 	rugged_set_owner(rb_walk, owner);
 	return rb_walk;
 }
